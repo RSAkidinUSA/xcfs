@@ -1,5 +1,5 @@
 
-obj-m := p3.o
+obj-m := p4.o
 
 CONFIG_MODULE_SIG=n
 
@@ -9,7 +9,7 @@ KDIR := ~/linux
 
 PWD := $(shell pwd)
 
-all: p3.c
+all: p4.c
 	make -C $(KDIR) SUBDIRS=$(PWD) modules
 
 clean:
