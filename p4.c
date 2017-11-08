@@ -10,6 +10,7 @@
 #define XCFS_MAGIC_NUMBER 	0x69
 #define CURRENT_TIME		1000
 
+
 static void xcfs_destroy_inode(struct inode* node)
 {
 
@@ -59,7 +60,7 @@ static int xcfs_fill_sb(struct super_block *sb, void *data, int silent)
 static struct dentry *xcfs_mount(struct file_system_type *type, int flags,
 					char const *dev, void *data)
 {
-	struct dentry *const entry = mount_bdev(type, flags, dev, data,
+	struct dentry *const entry = mount_nodev(type, flags, data,
 							xcfs_fill_sb);
 
 	if(IS_ERR(entry))
@@ -80,7 +81,7 @@ static struct file_system_type xcfs_type = {
 	.name = "xcfs",
 	.mount = xcfs_mount,
 	.kill_sb = xcfs_kill_sb,
-	.fs_flags = FS_REQUIRES_DEV,
+	.fs_flags = 0,
 };
 
 
@@ -139,12 +140,13 @@ static const struct file_operations xcfs_file_operations = {
 static int __init p4_init(void)
 {
 	printk("Loading module: p4\n");
-	return 0;
+	return register_filesystem(&xcfs_type);
 }
 
 static void __exit p4_exit(void)
 {
 	printk("Unloading module p4\n");
+	unregister_filesystem(&xcfs_type);
 }
 
 module_init(p4_init);
