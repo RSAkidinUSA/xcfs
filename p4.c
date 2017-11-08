@@ -153,5 +153,5 @@ module_init(p4_init);
 module_exit(p4_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Michael Monger <mpm8128@vt.edu>");
+MODULE_AUTHOR("Michael Monger <mpm8128@vt.edu>, Ryan Burrow <rsardb11@vt.edu>");
 MODULE_DESCRIPTION("XCFS - encrypted filesystem");
