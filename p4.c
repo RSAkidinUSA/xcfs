@@ -7,6 +7,7 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/fs_stack.h>
+#include <linux/file.h>
 
 #define XCFS_MAGIC_NUMBER 	0x69
 #define CURRENT_TIME		1000
@@ -231,10 +232,65 @@ static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
 	return err;
 }
 
+static ssize_t xcfs_read_iter(struct kiocb *iocb, struct iov_iter *iter)
+{
+	int err = 0;
+	struct file *file = iocb->ki_filp, *lower_file;
+
+	//lower_file = wrapfs_lower_file(file);
+	if(!lower_file->f_op->read_iter)
+	{
+		return -EINVAL;
+	}
+
+	get_file(lower_file); /* prevent lower_file from being released */
+	iocb->ki_filp = lower_file;
+	err = lower_file->f_op->read_iter(iocb, iter);
+	iocb->ki_filp = file;
+	fput(lower_file);
+	
+	if(err >= 0 || err == -EIOCBQUEUED)
+	{
+		fsstack_copy_attr_atime(file->f_path.dentry->d_inode,
+					file_inode(lower_file));
+	}
+	return err;
+}
+
+static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
+{
+	int err = 0;
+	struct file *file = iocb->ki_filp, *lower_file;
+	
+	//lower_file = wrapfs_lower_file(file);
+	if(!lower_file->f_op->write_iter)
+	{
+		return -EINVAL;
+	}
+
+	get_file(lower_file);
+	iocb->ki_filp = lower_file;
+	err = lower_file->f_op->write_iter(iocb, iter);
+	iocb->ki_filp = file;
+	fput(lower_file);
+
+	if(err >= 0 || err == -EIOCBQUEUED)
+	{
+		fsstack_copy_inode_size(file->f_path.dentry->d_inode,
+					file_inode(lower_file));
+		fsstack_copy_attr_times(file->f_path.dentry->d_inode,
+					file_inode(lower_file));
+	}
+	
+	return err;
+}	
+
 static const struct file_operations xcfs_file_operations = {
-	.llseek = xcfs_llseek,
-	.read = xcfs_read,
-	.write = xcfs_write,
+	.llseek 	= xcfs_llseek,
+	.read 		= xcfs_read,
+	.write 		= xcfs_write,
+	.read_iter 	= xcfs_read_iter,
+	.write_iter 	= xcfs_write_iter,
 };
 
 
