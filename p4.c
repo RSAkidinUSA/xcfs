@@ -363,13 +363,30 @@ static int xcfs_flush(struct file *file, fl_owner_t id)
 	return err;
 }
 
+static int xcfs_iterate(struct file *file, struct dir_context *ctx)
+{
+	int err = 0;
+	struct file *lower_file = NULL;
+	struct dentry *dentry = file->f_path.dentry;
+
+	//lower_file = wrapfs_lower_file(file);
+	err = iterate_dir(lower_file, ctx);
+	file->f_pos = lower_file->f_pos;
+	if(err >= 0)
+	{
+		fsstack_copy_attr_atime(dentry->d_inode,
+					file_inode(lower_file));
+	}
+	return err;
+}
+
 static const struct file_operations xcfs_file_operations = {
 	.llseek 	= xcfs_llseek,
 	.read 		= xcfs_read,
 	.write 		= xcfs_write,
 	.read_iter 	= xcfs_read_iter,
 	.write_iter 	= xcfs_write_iter,
-//	.iterate	= xcfs_iterate,
+	.iterate	= xcfs_iterate,
 //	.unlocked_ioctl	= xcfs_unlocked_ioctl,
 //	.compat_ioctl	= xcfs_compat_ioctl,
 //	.mmap		= xcfs_mmap,
@@ -384,7 +401,7 @@ static const struct file_operations xcfs_file_operations = {
 static const struct file_operations xcfs_dir_operations = {
 	.llseek		= xcfs_llseek,
 	.read		= generic_read_dir,
-//	.iterate	= xcfs_iterate,
+	.iterate	= xcfs_iterate,
 //	.unlocked_ioctl	= xcfs_unlocked_ioctl,
 //	.compat_ioctl	= xcfs_compat_ioctl,
 	.open		= xcfs_open,
