@@ -285,12 +285,113 @@ static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 	return err;
 }	
 
+static int xcfs_open(struct inode *inode, struct file *file)
+{
+	int err = 0;
+	//struct file *lower_file = NULL;
+	//struct path lower_path;
+
+	/*don't open unhashed/deleted files*/
+	if(d_unhashed(file->f_path.dentry))
+		return -ENOENT;
+
+	/*
+	file->private_data = 
+		kzalloc(sizeof(struct xcfs_file_info), GFP_KERNEL);
+	
+	if(!WRAPFS_F(file))
+		return -ENOMEM;
+	
+
+	wrapfs_get_lower_path(file->f_path.dentry, &lower_path);
+	lower_file = dentry_open(&lower_path, file->f_flags, current_cred());
+	path_put(&lower_path);
+	if(IS_ERR(lower_file))
+	{
+		err = PTR_ERR(lower_file);
+		lower_file = wrapfs_lower_file(file);
+		if(lower_file)
+		{
+			wrapfs_set_lower_file(file, NULL);
+			fput(lower_file);
+		}
+	}
+	else
+	{
+		wrapfs_set_lower_file(file, lower_file);
+	}
+
+	if(err)
+	{
+		kfree(WRAPFS_F(file));
+	}
+	else
+	{
+		fsstack_copy_attr_all(inode, wrapfs_lower_inode(inode));
+	}
+	*/
+	return err;
+}
+
+static int xcfs_release(struct inode *inode, struct file *file)
+{
+	struct file *lower_file = NULL;
+
+	//lower_file = wrapfs_lower_file(file);
+	if(lower_file)
+	{
+		//wrapfs_set_lower_file(file, NULL);
+		fput(lower_file);
+	}	
+
+	//kfree(WRAPFS_F(file);
+	return 0;
+}
+
+static int xcfs_flush(struct file *file, fl_owner_t id)
+{
+	int err = 0;
+	struct file *lower_file = NULL;
+
+	//lower_file = wrapfs_lower_file(file);
+	if(lower_file && lower_file->f_op && lower_file->f_op->flush)
+	{
+		filemap_write_and_wait(file->f_mapping);
+		err = lower_file->f_op->flush(lower_file, id);
+	}
+
+	return err;
+}
+
 static const struct file_operations xcfs_file_operations = {
 	.llseek 	= xcfs_llseek,
 	.read 		= xcfs_read,
 	.write 		= xcfs_write,
 	.read_iter 	= xcfs_read_iter,
 	.write_iter 	= xcfs_write_iter,
+//	.iterate	= xcfs_iterate,
+//	.unlocked_ioctl	= xcfs_unlocked_ioctl,
+//	.compat_ioctl	= xcfs_compat_ioctl,
+//	.mmap		= xcfs_mmap,
+	.open		= xcfs_open,
+	.flush		= xcfs_flush,
+	.release	= xcfs_release,
+//	.fsync		= xcfs_fsync,
+//	.fasync		= xcfs_fasync,
+//	.lock		= xcfs_lock,
+};
+
+static const struct file_operations xcfs_dir_operations = {
+	.llseek		= xcfs_llseek,
+	.read		= generic_read_dir,
+//	.iterate	= xcfs_iterate,
+//	.unlocked_ioctl	= xcfs_unlocked_ioctl,
+//	.compat_ioctl	= xcfs_compat_ioctl,
+	.open		= xcfs_open,
+	.release	= xcfs_release,
+//	.fsync		= xcfs_fsync,
+//	.fasync		= xcfs_fasync,
+//	.lock		= xcfs_lock,
 };
 
 
