@@ -111,11 +111,21 @@ static const struct inode_operations xcfs_inode_ops = {
 	.lookup = xcfs_lookup,
 };
 
+static void xcfs_decrypt(char* buf, size_t count)
+{
+	int i = 0;
+	
+	for(i = 0; i < count; ++i)
+	{
+		buf[i]--;
+	}
+}
+
 static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count, 
 				loff_t *ppos)
 {
 	struct file *lower_file;
-	//char* buf = NULL;
+	char* buf = NULL;
 	long retval = 0;
 	int err = 0;
 	struct dentry *dentry = file->f_path.dentry;
@@ -129,7 +139,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	}
 	err = retval;
 
-	/*
+	/**/
 	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
 	if(buf == NULL)
 	{
@@ -139,7 +149,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	retval = copy_from_user(buf, ubuf, count);
 	if(retval)
 	{
-		printk("xcfs_read: failed to copy %ld from user\n, retval");
+		printk("xcfs_read: failed to copy %ld from user\n", retval);
 		retval = -1;
 		goto xcfs_read_cleanup;
 	}
@@ -157,10 +167,18 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 
 	xcfs_read_cleanup:
 	kfree(buf);	
-
-	*/
+	/**/
 
 	return retval;
+}
+
+static void xcfs_encrypt(char* buf, size_t count)
+{
+	int i = 0;
+	for(i = 0; i < count; ++i)
+	{
+		buf[i]++;
+	}
 }
 
 static ssize_t xcfs_write(struct file *file, const char __user *ubuf, 
