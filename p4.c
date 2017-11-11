@@ -116,6 +116,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	struct file *lower_file;
 	//char* buf = NULL;
 	long retval = 0;
+	int err = 0;
 	struct dentry *dentry = file->f_path.dentry;
 
 	//lower_file = wrapfs_lower_file(file);
@@ -125,6 +126,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 		fsstack_copy_attr_atime(dentry->d_inode, 
 					file_inode(lower_file));
 	}
+	err = retval;
 
 	/*
 	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
@@ -136,7 +138,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	retval = copy_from_user(buf, ubuf, count);
 	if(retval)
 	{
-		printk("xcfs_read: failed to copy %ld from user\n");
+		printk("xcfs_read: failed to copy %ld from user\n, retval");
 		retval = -1;
 		goto xcfs_read_cleanup;
 	}
@@ -146,7 +148,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	retval = copy_to_user(ubuf, buf, count);
 	if(retval)
 	{
-		printk("xcfs_read: failed to copy %ld to user\n");
+		printk("xcfs_read: failed to copy %ld to user\n", retval);
 		retval = -1;
 		goto xcfs_read_cleanup;
 	}
@@ -160,16 +162,58 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	return retval;
 }
 
-static ssize_t xcfs_write(struct file* f, const char __user* ubuf, 
-				size_t st, loff_t* lt)
+static ssize_t xcfs_write(struct file *file, const char __user *ubuf, 
+				size_t count, loff_t *ppos)
 {
-	return 0;
-}
+	long retval = 0;
+	struct file *lower_file;
+	//char *buf = NULL;
+	struct dentry *dentry = file->f_path.dentry;
 
-static const struct file_operations xcfs_dir_operations = {
-	.owner = THIS_MODULE,
-//	.readdir = NULL;//xcfs_readdir,
-};
+	/*
+	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
+	if(buf == NULL)
+	{
+		printk("xcfs_write: allocation failed for buf\n");
+		return -1;
+	}
+	
+	retval = copy_from_user(buf, ubuf, count);
+	if(retval)
+	{
+		printk("xcfs_write: failed to copy %ld from user\n", retval);
+		retval = -1;
+		goto xcfs_write_cleanup;
+	}
+	
+	xcfs_encrypt(buf, count);
+
+	retval = copy_to_user(ubuf, buf, count);
+	if(retval)
+	{
+		printk("xcfs_write: failed to copy %ld to user\n", retval);
+		retval = -1;
+		goto xcfs_write_cleanup;
+	}
+	*/
+
+	//lower_file = wrapfs_lower_file(file);
+	retval = vfs_write(lower_file, ubuf, count, ppos);
+	if(retval >= 0)
+	{
+		fsstack_copy_inode_size(dentry->d_inode,
+					file_inode(lower_file));
+		fsstack_copy_attr_times(dentry->d_inode,
+					file_inode(lower_file));
+	}
+
+	/*
+	xcfs_write_cleanup:
+	kfree(buf);
+	*/
+
+	return retval;
+}
 
 static const struct file_operations xcfs_file_operations = {
 	.read = xcfs_read,
