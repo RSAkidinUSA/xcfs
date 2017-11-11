@@ -215,7 +215,24 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	return retval;
 }
 
+static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
+{
+	int err;
+	struct file *lower_file;
+
+	err = generic_file_llseek(file, offset, whence);
+	if(err < 0) {
+		printk("xcfs_llseek: failed initial seek, aborting\n");
+		return err;
+	}
+	
+	//lower_file = wrapfs_lower_file(file);
+	err = generic_file_llseek(lower_file, offset, whence);
+	return err;
+}
+
 static const struct file_operations xcfs_file_operations = {
+	.llseek = xcfs_llseek,
 	.read = xcfs_read,
 	.write = xcfs_write,
 };
