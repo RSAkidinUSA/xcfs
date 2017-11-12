@@ -1,11 +1,10 @@
-
-obj-m := p4.o
+obj-m := xcfs.o
+xcfs-objs := p4.o
 
 CONFIG_MODULE_SIG=n
 
 #this should be the path to your kernel source directory
 KDIR := ~/linux
-#KDIR := /lib/modules/$(shell uname -r)/build
 
 PWD := $(shell pwd)
 
