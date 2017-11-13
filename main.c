@@ -63,13 +63,13 @@ static struct file_system_type xcfs_type = {
 
 static int __init p4_init(void)
 {
-	printk("Loading module: p4\n");
+	printk(PRINT_PREF "Loading module: %s\n", XCFS_NAME);
 	return register_filesystem(&xcfs_type);
 }
 
 static void __exit p4_exit(void)
 {
-	printk("Unloading module p4\n");
+	printk(PRINT_PREF "Unloading module: %s\n", XCFS_NAME);
 	unregister_filesystem(&xcfs_type);
 }
 

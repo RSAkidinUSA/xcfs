@@ -1,6 +1,6 @@
 #include "xcfs.h"
 
-
+/* encrypt and decrypt functions */
 static void xcfs_decrypt(char* buf, size_t count)
 {
 	int i = 0;
@@ -11,6 +11,34 @@ static void xcfs_decrypt(char* buf, size_t count)
 	}
 }
 
+static void xcfs_encrypt(char* buf, size_t count)
+{
+	int i = 0;
+	for(i = 0; i < count; ++i)
+	{
+		buf[i]++;
+	}
+}
+
+/* file operations in order of listing in struct */
+/* llseek */
+static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
+{
+	int err;
+	struct file *lower_file;
+
+	err = generic_file_llseek(file, offset, whence);
+	if(err < 0) {
+		printk("xcfs_llseek: failed initial seek, aborting\n");
+		return err;
+	}
+	
+	//lower_file = wrapfs_lower_file(file);
+	err = generic_file_llseek(lower_file, offset, whence);
+	return err;
+}
+
+/* read */
 static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count, 
 				loff_t *ppos)
 {
@@ -62,15 +90,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	return retval;
 }
 
-static void xcfs_encrypt(char* buf, size_t count)
-{
-	int i = 0;
-	for(i = 0; i < count; ++i)
-	{
-		buf[i]++;
-	}
-}
-
+/* write */
 static ssize_t xcfs_write(struct file *file, const char __user *ubuf, 
 				size_t count, loff_t *ppos)
 {
@@ -124,22 +144,7 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	return retval;
 }
 
-static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
-{
-	int err;
-	struct file *lower_file;
-
-	err = generic_file_llseek(file, offset, whence);
-	if(err < 0) {
-		printk("xcfs_llseek: failed initial seek, aborting\n");
-		return err;
-	}
-	
-	//lower_file = wrapfs_lower_file(file);
-	err = generic_file_llseek(lower_file, offset, whence);
-	return err;
-}
-
+/* read iter */ 
 static ssize_t xcfs_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	int err = 0;
@@ -165,6 +170,7 @@ static ssize_t xcfs_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	return err;
 }
 
+/* write iter */
 static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	int err = 0;
@@ -193,6 +199,31 @@ static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 	return err;
 }	
 
+/* iterate */
+static int xcfs_iterate(struct file *file, struct dir_context *ctx)
+{
+	int err = 0;
+	struct file *lower_file = NULL;
+	struct dentry *dentry = file->f_path.dentry;
+
+	//lower_file = wrapfs_lower_file(file);
+	err = iterate_dir(lower_file, ctx);
+	file->f_pos = lower_file->f_pos;
+	if(err >= 0)
+	{
+		fsstack_copy_attr_atime(dentry->d_inode,
+					file_inode(lower_file));
+	}
+	return err;
+}
+
+
+
+/* unlocked ioctl */
+/* compat ioctl */
+/* mmap */
+
+/* open */
 static int xcfs_open(struct inode *inode, struct file *file)
 {
 	int err = 0;
@@ -241,21 +272,7 @@ static int xcfs_open(struct inode *inode, struct file *file)
 	return err;
 }
 
-static int xcfs_release(struct inode *inode, struct file *file)
-{
-	struct file *lower_file = NULL;
-
-	//lower_file = wrapfs_lower_file(file);
-	if(lower_file)
-	{
-		//wrapfs_set_lower_file(file, NULL);
-		fput(lower_file);
-	}	
-
-	//kfree(WRAPFS_F(file);
-	return 0;
-}
-
+/* flush */
 static int xcfs_flush(struct file *file, fl_owner_t id)
 {
 	int err = 0;
@@ -271,29 +288,52 @@ static int xcfs_flush(struct file *file, fl_owner_t id)
 	return err;
 }
 
-static int xcfs_iterate(struct file *file, struct dir_context *ctx)
+/* release */
+static int xcfs_release(struct inode *inode, struct file *file)
 {
-	int err = 0;
 	struct file *lower_file = NULL;
-	struct dentry *dentry = file->f_path.dentry;
 
 	//lower_file = wrapfs_lower_file(file);
-	err = iterate_dir(lower_file, ctx);
-	file->f_pos = lower_file->f_pos;
-	if(err >= 0)
+	if(lower_file)
 	{
-		fsstack_copy_attr_atime(dentry->d_inode,
-					file_inode(lower_file));
-	}
+		//wrapfs_set_lower_file(file, NULL);
+		fput(lower_file);
+	}	
+
+	//kfree(WRAPFS_F(file);
+	return 0;
+}
+
+/* fsync */
+static int xcfs_fsync(struct file *file, loff_t start, loff_t end,
+			int datasync)
+{
+	int err;
+	struct file *lower_file;
+	struct path lower_path;
+	struct dentry *dentry = file->f_path.dentry;
+
+	err = __generic_file_fsync(file, start, end, datasync);
+	if (err)
+		goto out;
+	lower_file = xcfs_lower_file(file);
+	xcfs_get_lower_path(dentry, &lower_path);
+	err = vfs_fsync_range(lower_file, start, end, datasync);
+	xcfs_put_lower_path(dentry, &lower_path);
+out:
 	return err;
 }
 
+/* fasync */
+/* lock */
+
+/* file operations for files and dirs */
 const struct file_operations xcfs_file_ops = {
 	.llseek 	= xcfs_llseek,
 	.read 		= xcfs_read,
 	.write 		= xcfs_write,
 	.read_iter 	= xcfs_read_iter,
-	.write_iter 	= xcfs_write_iter,
+	.write_iter = xcfs_write_iter,
 	.iterate	= xcfs_iterate,
 //	.unlocked_ioctl	= xcfs_unlocked_ioctl,
 //	.compat_ioctl	= xcfs_compat_ioctl,
@@ -301,7 +341,7 @@ const struct file_operations xcfs_file_ops = {
 	.open		= xcfs_open,
 	.flush		= xcfs_flush,
 	.release	= xcfs_release,
-//	.fsync		= xcfs_fsync,
+	.fsync		= xcfs_fsync,
 //	.fasync		= xcfs_fasync,
 //	.lock		= xcfs_lock,
 };
@@ -314,7 +354,7 @@ const struct file_operations xcfs_dir_ops = {
 //	.compat_ioctl	= xcfs_compat_ioctl,
 	.open		= xcfs_open,
 	.release	= xcfs_release,
-//	.fsync		= xcfs_fsync,
+	.fsync		= xcfs_fsync,
 //	.fasync		= xcfs_fasync,
 //	.lock		= xcfs_lock,
 };
