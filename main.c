@@ -46,16 +46,11 @@ static struct dentry *xcfs_mount(struct file_system_type *type, int flags,
 	return entry;
 }
 
-static void xcfs_kill_sb(struct super_block* sb)
-{
-	
-}
-
 static struct file_system_type xcfs_type = {
 	.owner = THIS_MODULE,
 	.name = XCFS_NAME,
 	.mount = xcfs_mount,
-	.kill_sb = xcfs_kill_sb,
+	.kill_sb = generic_shutdown_super,
 	.fs_flags = 0,
 };
 
@@ -63,13 +58,32 @@ static struct file_system_type xcfs_type = {
 
 static int __init p4_init(void)
 {
-	printk(PRINT_PREF "Loading module: %s\n", XCFS_NAME);
-	return register_filesystem(&xcfs_type);
+    int retval;
+	
+    printk(PRINT_PREF "Loading module: %s\n", XCFS_NAME);
+    
+    retval = xcfs_init_inode_cache();
+    if (retval) {
+        goto out;
+    } 
+    retval = xcfs_init_dentry_cache();
+    if (retval) {
+        goto out;
+    }
+	retval = register_filesystem(&xcfs_type);
+out:
+    if (retval) {
+        xcfs_destroy_inode_cache();
+        xcfs_destroy_dentry_cache();
+    }
+    return retval;
 }
 
 static void __exit p4_exit(void)
 {
 	printk(PRINT_PREF "Unloading module: %s\n", XCFS_NAME);
+    xcfs_destroy_inode_cache();
+    xcfs_destroy_dentry_cache();
 	unregister_filesystem(&xcfs_type);
 }
 
