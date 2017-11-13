@@ -156,20 +156,20 @@ static inline void xcfs_put_reset_lower_path(const struct dentry *dent)
 }
 
 /* locking helpers */
-/*
+
 static inline struct dentry *lock_parent(struct dentry *dentry)
 {
 	struct dentry *dir = dget_parent(dentry);
-	mutex_lock_nested(&dir->d_inode->i_mutex, I_MUTEX_PARENT);
+	inode_lock_nested(dir->d_inode, I_MUTEX_PARENT);
 	return dir;
 }
 
 static inline void unlock_dir(struct dentry *dir)
 {
-	mutex_unlock(&dir->d_inode->i_mutex);
+	inode_unlock(dir->d_inode);
 	dput(dir);
 }
-*/
+
 
 
 #endif	/* not _XCFS_H_ */
