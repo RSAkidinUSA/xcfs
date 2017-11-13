@@ -1,6 +1,5 @@
 #include "xcfs.h"
 
-
 static int xcfs_fill_sb(struct super_block *sb, void *data, int silent)
 {
 	struct inode *root = NULL;
@@ -38,10 +37,11 @@ static struct dentry *xcfs_mount(struct file_system_type *type, int flags,
 	struct dentry *const entry = mount_nodev(type, flags, data,
 							xcfs_fill_sb);
 
-	if(IS_ERR(entry))
-		printk("xcfs mounting failed\n");
-	else
-		printk("xcfs mounted\n");
+	if(IS_ERR(entry)) {
+		printk(PRINT_PREF "xcfs mounting failed\n");
+    } else {
+		printk(PRINT_PREF "xcfs mounted\n");
+    }
 	
 	return entry;
 }
