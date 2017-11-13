@@ -14,6 +14,7 @@
 
 #define XCFS_MAGIC_NUMBER 	0x69
 #define CURRENT_TIME		1000
+#define XCFS_NAME           "xcfs"
 
 static void xcfs_destroy_inode(struct inode *inode);
 

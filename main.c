@@ -1,22 +1,4 @@
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/fs.h>
-#include <linux/fs_stack.h>
-#include <linux/file.h>
-
-#define XCFS_MAGIC_NUMBER 	0x69
-#define CURRENT_TIME		1000
-
-
-static void xcfs_destroy_inode(struct inode* node)
-{
-
-}
+#include "xcfs.h"
 
 static void xcfs_put_super(struct super_block* sb)
 {
@@ -80,11 +62,12 @@ static void xcfs_kill_sb(struct super_block* sb)
 
 static struct file_system_type xcfs_type = {
 	.owner = THIS_MODULE,
-	.name = "xcfs",
+	.name = XCFS_NAME,
 	.mount = xcfs_mount,
 	.kill_sb = xcfs_kill_sb,
 	.fs_flags = 0,
 };
+
 
 
 
