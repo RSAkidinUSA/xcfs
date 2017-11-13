@@ -16,7 +16,10 @@
 #define CURRENT_TIME		1000
 #define XCFS_NAME           "xcfs"
 
-static void xcfs_destroy_inode(struct inode *inode);
-
+/* operations vectors defined in specific files */
+extern const struct inode_operations xcfs_inode_ops;
+extern const struct super_operations xcfs_sb_ops;
+extern const struct file_operations xcfs_file_ops;
+extern const struct file_operations xcfs_dir_ops;
 
 #endif	/* not _XCFS_H_ */
