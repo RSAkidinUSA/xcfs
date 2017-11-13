@@ -1,6 +1,6 @@
 obj-m := xcfs.o
 #xcfs-objs := p4.o
-xcfs-objs := dentry.o file.o inode.o main.o super.o
+xcfs-objs := dentry.o file.o inode.o lookup.o main.o super.o
 
 CONFIG_MODULE_SIG=n
 

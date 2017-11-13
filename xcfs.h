@@ -1,16 +1,21 @@
 #ifndef _XCFS_H_
 #define _XCFS_H_
 
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/fs.h>
-#include <linux/fs_stack.h>
+#include <linux/dcache.h>
 #include <linux/file.h>
+#include <linux/fs.h>
+#include <linux/aio.h>
+#include <linux/mm.h>
+#include <linux/mount.h>
+#include <linux/namei.h>
+#include <linux/seq_file.h>
+#include <linux/statfs.h>
+#include <linux/fs_stack.h>
+#include <linux/magic.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
+#include <linux/module.h>
 
 #define XCFS_MAGIC_NUMBER 	0x69
 #define CURRENT_TIME		1000
@@ -18,10 +23,32 @@
 #define PRINT_PREF KERN_INFO "[xcfs]: "
 
 /* operations vectors defined in specific files */
-extern const struct inode_operations xcfs_inode_ops;
-extern const struct super_operations xcfs_sb_ops;
 extern const struct file_operations xcfs_file_ops;
 extern const struct file_operations xcfs_dir_ops;
+extern const struct inode_operations xcfs_inode_file_ops;
+extern const struct inode_operations xcfs_inode_dir_ops;
+extern const struct inode_operations xcfs_inode_sym_ops;
+extern const struct super_operations xcfs_sb_ops;
+extern const struct dentry_operations xcfs_dent_ops;
+extern const struct address_space_operations xcfs_addr_ops, xcfs_dummy_addr_ops;
+
+extern int xcfs_init_inode_cache(void);
+extern void xcfs_destroy_inode_cache(void);
+extern int xcfs_init_dentry_cache(void);
+extern void xcfs_destroy_dentry_cache(void);
+extern int new_dentry_private_data(struct dentry *dentry);
+extern void free_dentry_private_data(struct dentry *dentry);
+extern struct dentry *xcfs_lookup(struct inode *dir, struct dentry *dentry,
+				    unsigned int flags);
+extern struct inode *xcfs_iget(struct super_block *sb,
+				 struct inode *lower_inode);
+extern int xcfs_interpose(struct dentry *dentry, struct super_block *sb,
+			    struct path *lower_path);
+
+/* vfs_path_lookup is exported but not included in any headers */
+int vfs_path_lookup(struct dentry *dentry, struct vfsmount *mnt,
+                const char *name, unsigned int flags,
+                struct path *path);
 
 /* copied from wrapfs and modified */
 /* deals with private data of different structs */
@@ -169,7 +196,5 @@ static inline void unlock_dir(struct dentry *dir)
 	inode_unlock(dir->d_inode);
 	dput(dir);
 }
-
-
 
 #endif	/* not _XCFS_H_ */

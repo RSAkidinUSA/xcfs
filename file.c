@@ -85,7 +85,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf, size_t count,
 	}
 	retval = err; 
 
-	xcfs_read_cleanup:
+xcfs_read_cleanup:
 	kfree(buf);
     */
 
@@ -141,7 +141,7 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 
     /* encryption cont */
     /*
-	xcfs_write_cleanup:
+xcfs_write_cleanup:
     kfree(buf);
     */
 
