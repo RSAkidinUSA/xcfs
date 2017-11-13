@@ -1,5 +1,6 @@
 obj-m := xcfs.o
-xcfs-objs := p4.o
+#xcfs-objs := p4.o
+xcfs-objs := file.o inode.o main.o
 
 CONFIG_MODULE_SIG=n
 
@@ -8,7 +9,9 @@ KDIR := ~/linux
 
 PWD := $(shell pwd)
 
-all: p4.c
+all: module
+
+module:
 	make -C $(KDIR) SUBDIRS=$(PWD) modules
 
 clean:
