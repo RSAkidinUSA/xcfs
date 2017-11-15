@@ -233,6 +233,10 @@ static int xcfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct dentry *trap = NULL;
 	struct path lower_old_path, lower_new_path;
 
+    if (flags) {
+        return -EINVAL;
+    }
+
 	xcfs_get_lower_path(old_dentry, &lower_old_path);
 	xcfs_get_lower_path(new_dentry, &lower_new_path);
 	lower_old_dentry = lower_old_path.dentry;
@@ -301,6 +305,38 @@ out:
 	return err;
 }
 
+static const char *xcfs_get_link(struct dentry *dentry, struct inode *inode,
+				   struct delayed_call *done)
+{
+	char *buf;
+	int len = PAGE_SIZE, err;
+	mm_segment_t old_fs;
+
+	if (!dentry)
+		return ERR_PTR(-ECHILD);
+
+	/* This is freed by the put_link method assuming a successful call. */
+	buf = kmalloc(len, GFP_KERNEL);
+	if (!buf) {
+		buf = ERR_PTR(-ENOMEM);
+		return buf;
+	}
+
+	/* read the symlink, and then we will follow it */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = xcfs_readlink(dentry, buf, len);
+	set_fs(old_fs);
+	if (err < 0) {
+		kfree(buf);
+		buf = ERR_PTR(err);
+	} else {
+		buf[err] = '\0';
+	}
+	set_delayed_call(done, kfree_link, buf);
+	return buf;
+}
+
 static int xcfs_permission(struct inode *inode, int mask)
 {
 	struct inode *lower_inode;
@@ -311,20 +347,213 @@ static int xcfs_permission(struct inode *inode, int mask)
 	return err;
 }
 
+static int xcfs_setattr(struct dentry *dentry, struct iattr *ia)
+{
+	int err;
+	struct dentry *lower_dentry;
+	struct inode *inode;
+	struct inode *lower_inode;
+	struct path lower_path;
+	struct iattr lower_ia;
+
+	inode = d_inode(dentry);
+
+	/*
+	 * Check if user has permission to change inode.  We don't check if
+	 * this user can change the lower inode: that should happen when
+	 * calling notify_change on the lower inode.
+	 */
+	err = setattr_prepare(dentry, ia);
+	if (err)
+		goto out_err;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	lower_dentry = lower_path.dentry;
+	lower_inode = xcfs_lower_inode(inode);
+
+	/* prepare our own lower struct iattr (with the lower file) */
+	memcpy(&lower_ia, ia, sizeof(lower_ia));
+	if (ia->ia_valid & ATTR_FILE)
+		lower_ia.ia_file = xcfs_lower_file(ia->ia_file);
+
+	/*
+	 * If shrinking, first truncate upper level to cancel writing dirty
+	 * pages beyond the new eof; and also if its' maxbytes is more
+	 * limiting (fail with -EFBIG before making any change to the lower
+	 * level).  There is no need to vmtruncate the upper level
+	 * afterwards in the other cases: we fsstack_copy_inode_size from
+	 * the lower level.
+	 */
+	if (ia->ia_valid & ATTR_SIZE) {
+		err = inode_newsize_ok(inode, ia->ia_size);
+		if (err)
+			goto out;
+		truncate_setsize(inode, ia->ia_size);
+	}
+
+	/*
+	 * mode change is for clearing setuid/setgid bits. Allow lower fs
+	 * to interpret this in its own way.
+	 */
+	if (lower_ia.ia_valid & (ATTR_KILL_SUID | ATTR_KILL_SGID))
+		lower_ia.ia_valid &= ~ATTR_MODE;
+
+	/* notify the (possibly copied-up) lower inode */
+	/*
+	 * Note: we use d_inode(lower_dentry), because lower_inode may be
+	 * unlinked (no inode->i_sb and i_ino==0.  This happens if someone
+	 * tries to open(), unlink(), then ftruncate() a file.
+	 */
+	inode_lock(d_inode(lower_dentry));
+	err = notify_change(lower_dentry, &lower_ia, /* note: lower_ia */
+			    NULL);
+	inode_unlock(d_inode(lower_dentry));
+	if (err)
+		goto out;
+
+	/* get attributes from the lower inode */
+	fsstack_copy_attr_all(inode, lower_inode);
+	/*
+	 * Not running fsstack_copy_inode_size(inode, lower_inode), because
+	 * VFS should update our inode size, and notify_change on
+	 * lower_inode should update its size.
+	 */
+
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+out_err:
+	return err;
+}
+/*
+static int xcfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
+			  struct kstat *stat)
+{
+	int err;
+	struct kstat lower_stat;
+	struct path lower_path;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	err = vfs_getattr(&lower_path, &lower_stat);
+	if (err)
+		goto out;
+	fsstack_copy_attr_all(d_inode(dentry),
+			      d_inode(lower_path.dentry));
+	generic_fillattr(d_inode(dentry), stat);
+	stat->blocks = lower_stat.blocks;
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+	return err;
+}
+*/
+
+static int
+xcfs_setxattr(struct dentry *dentry, struct inode *inode, const char *name,
+		const void *value, size_t size, int flags)
+{
+	int err; struct dentry *lower_dentry;
+	struct path lower_path;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	lower_dentry = lower_path.dentry;
+	if (!(d_inode(lower_dentry)->i_opflags & IOP_XATTR)) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+	err = vfs_setxattr(lower_dentry, name, value, size, flags);
+	if (err)
+		goto out;
+	fsstack_copy_attr_all(d_inode(dentry),
+			      d_inode(lower_path.dentry));
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+	return err;
+}
+
+static ssize_t
+xcfs_getxattr(struct dentry *dentry, struct inode *inode,
+		const char *name, void *buffer, size_t size)
+{
+	int err;
+	struct dentry *lower_dentry;
+	struct inode *lower_inode;
+	struct path lower_path;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	lower_dentry = lower_path.dentry;
+	lower_inode = xcfs_lower_inode(inode);
+	if (!(d_inode(lower_dentry)->i_opflags & IOP_XATTR)) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+	err = vfs_getxattr(lower_dentry, name, buffer, size);
+	if (err)
+		goto out;
+	fsstack_copy_attr_atime(d_inode(dentry),
+				d_inode(lower_path.dentry));
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+	return err;
+}
+
+static ssize_t
+xcfs_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
+{
+	int err;
+	struct dentry *lower_dentry;
+	struct path lower_path;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	lower_dentry = lower_path.dentry;
+	if (!(d_inode(lower_dentry)->i_opflags & IOP_XATTR)) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+	err = vfs_listxattr(lower_dentry, buffer, buffer_size);
+	if (err)
+		goto out;
+	fsstack_copy_attr_atime(d_inode(dentry),
+				d_inode(lower_path.dentry));
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+	return err;
+}
+
+static int
+xcfs_removexattr(struct dentry *dentry, struct inode *inode, const char *name)
+{
+	int err;
+	struct dentry *lower_dentry;
+	struct inode *lower_inode;
+	struct path lower_path;
+
+	xcfs_get_lower_path(dentry, &lower_path);
+	lower_dentry = lower_path.dentry;
+	lower_inode = xcfs_lower_inode(inode);
+	if (!(lower_inode->i_opflags & IOP_XATTR)) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+	err = vfs_removexattr(lower_dentry, name);
+	if (err)
+		goto out;
+	fsstack_copy_attr_all(d_inode(dentry), lower_inode);
+out:
+	xcfs_put_lower_path(dentry, &lower_path);
+	return err;
+}
+
 const struct inode_operations xcfs_inode_sym_ops = {
-	.permission	    = xcfs_permission,
     .readlink	    = xcfs_readlink,
-};
-
-const struct inode_operations xcfs_inode_file_ops = {
-    .permission	    = xcfs_permission,
-
+	.permission	    = xcfs_permission,
+    .setattr        = xcfs_setattr,
+    /* .getattr        = xcfs_getattr, */
+    .get_link       = xcfs_get_link,
+    .listxattr      = xcfs_listxattr,
 };
 
 const struct inode_operations xcfs_inode_dir_ops = {
-    .lookup		    = xcfs_lookup,
-	.permission	    = xcfs_permission,
     .create         = xcfs_create,
+    .lookup		    = xcfs_lookup,
 	.link		    = xcfs_link,
 	.unlink		    = xcfs_unlink,
 	.symlink	    = xcfs_symlink,
@@ -332,6 +561,46 @@ const struct inode_operations xcfs_inode_dir_ops = {
 	.rmdir		    = xcfs_rmdir,
 	.mknod		    = xcfs_mknod,
 	.rename		    = xcfs_rename,
+	.permission	    = xcfs_permission,
+    .setattr        = xcfs_setattr,
+    /* .getattr        = xcfs_getattr, */
+    .listxattr      = xcfs_listxattr,
 };
 
+const struct inode_operations xcfs_inode_file_ops = {
+    .permission	    = xcfs_permission,
+    .setattr        = xcfs_setattr,
+    /* .getattr        = xcfs_getattr, */
+    .listxattr      = xcfs_listxattr,
+};
+
+static int xcfs_xattr_get(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *name, void *buffer, size_t size)
+{
+	return xcfs_getxattr(dentry, inode, name, buffer, size);
+}
+
+static int xcfs_xattr_set(const struct xattr_handler *handler,
+			    struct dentry *dentry, struct inode *inode,
+			    const char *name, const void *value, size_t size,
+			    int flags)
+{
+	if (value)
+		return xcfs_setxattr(dentry, inode, name, value, size, flags);
+
+	BUG_ON(flags != XATTR_REPLACE);
+	return xcfs_removexattr(dentry, inode, name);
+}
+
+const struct xattr_handler xcfs_xattr_handler = {
+	.prefix = "",		/* match anything */
+	.get = xcfs_xattr_get,
+	.set = xcfs_xattr_set,
+};
+
+const struct xattr_handler *xcfs_xattr_handlers[] = {
+	&xcfs_xattr_handler,
+	NULL
+};
 
