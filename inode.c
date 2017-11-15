@@ -424,9 +424,16 @@ out:
 out_err:
 	return err;
 }
+
+/* new format is 
+static int xcfs_getattr(struct path *path, struct kstat *stat, u32 u, 
+        unsigned int ui) 
+{
+*/
+
 /*
 static int xcfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
-			  struct kstat *stat)
+		struct kstat *stat)
 {
 	int err;
 	struct kstat lower_stat;
