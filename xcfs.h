@@ -15,6 +15,8 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/xattr.h>
+#include <linux/exportfs.h>
 #include <linux/module.h>
 
 #define XCFS_MAGIC_NUMBER 	0x69
@@ -31,6 +33,9 @@ extern const struct inode_operations xcfs_inode_sym_ops;
 extern const struct super_operations xcfs_sb_ops;
 extern const struct dentry_operations xcfs_dent_ops;
 extern const struct address_space_operations xcfs_addr_ops, xcfs_dummy_addr_ops;
+extern const struct vm_operations_struct xcfs_vm_ops;
+extern const struct export_operations xcfs_export_ops;
+extern const struct xattr_handler *xcfs_xattr_handlers[];
 
 extern int xcfs_init_inode_cache(void);
 extern void xcfs_destroy_inode_cache(void);
@@ -49,6 +54,12 @@ extern int xcfs_interpose(struct dentry *dentry, struct super_block *sb,
 int vfs_path_lookup(struct dentry *dentry, struct vfsmount *mnt,
                 const char *name, unsigned int flags,
                 struct path *path);
+
+/* vfs_listxattr is exported but not included in any headers */
+ssize_t vfs_listxattr(struct dentry *dentry, char *list, size_t size);
+
+/* vfs_removexattr is exported but not included in any headers */
+int vfs_removexattr(struct dentry *dentry, const char *name);
 
 /* copied from wrapfs and modified */
 /* deals with private data of different structs */
