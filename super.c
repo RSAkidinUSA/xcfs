@@ -149,4 +149,42 @@ const struct super_operations xcfs_sb_ops = {
 	.drop_inode	    = generic_delete_inode,
 };
 
+/* NFS support */
 
+static struct inode *xcfs_nfs_get_inode(struct super_block *sb, u64 ino,
+					  u32 generation)
+{
+	struct super_block *lower_sb;
+	struct inode *inode;
+	struct inode *lower_inode;
+
+	lower_sb = xcfs_lower_super(sb);
+	lower_inode = ilookup(lower_sb, ino);
+	inode = xcfs_iget(sb, lower_inode);
+	return inode;
+}
+
+static struct dentry *xcfs_fh_to_dentry(struct super_block *sb,
+					  struct fid *fid, int fh_len,
+					  int fh_type)
+{
+	return generic_fh_to_dentry(sb, fid, fh_len, fh_type,
+				    xcfs_nfs_get_inode);
+}
+
+static struct dentry *xcfs_fh_to_parent(struct super_block *sb,
+					  struct fid *fid, int fh_len,
+					  int fh_type)
+{
+	return generic_fh_to_parent(sb, fid, fh_len, fh_type,
+				    xcfs_nfs_get_inode);
+}
+
+/*
+ * all other funcs are default as defined in exportfs/expfs.c
+ */
+
+const struct export_operations xcfs_export_ops = {
+	.fh_to_dentry	   = xcfs_fh_to_dentry,
+	.fh_to_parent	   = xcfs_fh_to_parent
+};
