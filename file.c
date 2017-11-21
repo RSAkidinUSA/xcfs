@@ -72,7 +72,6 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	struct file *lower_file;
 	long retval = 0;
 	char *buf = NULL;
-	char *wbuf = NULL;
 	struct dentry *dentry = file->f_path.dentry;
 	mm_segment_t old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -94,21 +93,6 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	
 	xcfs_encrypt(buf, count);
 
-	wbuf = kcalloc(count, sizeof(char), GFP_USER);
-	if(!wbuf)
-	{
-		printk("xcfs_write: failed to allocate wbuf\n");
-		retval = -1;
-		goto xcfs_write_cleanup;
-	}
-//	retval = copy_to_user(wbuf, buf, count);
-	if(retval) {
-		printk("xcfs_write: failed to copy %ld to user\n", retval);
-		retval = -1;
-		goto xcfs_write_cleanup;
-	}
-	
-
 	lower_file = xcfs_lower_file(file);
 	retval = vfs_write(lower_file, buf, count, ppos);
 	if(retval >= 0) {
@@ -122,7 +106,6 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 
 	/* encryption cont */
 	xcfs_write_cleanup:
-	kfree(wbuf);
     	kfree(buf);
 	set_fs(old_fs);
 
