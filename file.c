@@ -36,14 +36,13 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	err = retval;
 
     /* decryption */
-    /*
 	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
 	if(buf == NULL) {
 		printk("xcfs_read: allocation failed for buf\n");
 		return -1;
-    }
+	}
 
-    retval = copy_from_user(buf, ubuf, count);
+    	retval = copy_from_user(buf, ubuf, count);
 	if(retval) {
 		printk("xcfs_read: failed to copy %ld from user\n", retval);
 		retval = -1;
@@ -62,7 +61,6 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 
 xcfs_read_cleanup:
 	kfree(buf);
-    */
 
 	return retval;
 }
@@ -71,13 +69,16 @@ xcfs_read_cleanup:
 static ssize_t xcfs_write(struct file *file, const char __user *ubuf, 
         size_t count, loff_t *ppos) 
 {
-	long retval = 0;
 	struct file *lower_file;
+	long retval = 0;
 	char *buf = NULL;
+	char *wbuf = NULL;
 	struct dentry *dentry = file->f_path.dentry;
+	mm_segment_t old_fs = get_fs();
+	set_fs(KERNEL_DS);
         
-    /* encryption */
-	/*
+    	/* encryption */
+	
 	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
 	if(buf == NULL) {
 		printk("xcfs_write: allocation failed for buf\n");
@@ -93,28 +94,37 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	
 	xcfs_encrypt(buf, count);
 
-	retval = copy_to_user(ubuf, buf, count);
+	wbuf = kcalloc(count, sizeof(char), GFP_USER);
+	if(!wbuf)
+	{
+		printk("xcfs_write: failed to allocate wbuf\n");
+		retval = -1;
+		goto xcfs_write_cleanup;
+	}
+//	retval = copy_to_user(wbuf, buf, count);
 	if(retval) {
 		printk("xcfs_write: failed to copy %ld to user\n", retval);
 		retval = -1;
 		goto xcfs_write_cleanup;
 	}
-	*/
+	
 
 	lower_file = xcfs_lower_file(file);
-	retval = vfs_write(lower_file, ubuf, count, ppos);
+	retval = vfs_write(lower_file, buf, count, ppos);
 	if(retval >= 0) {
-        fsstack_copy_inode_size(dentry->d_inode,
+ 	       	fsstack_copy_inode_size(dentry->d_inode,
 					file_inode(lower_file));
 		fsstack_copy_attr_times(dentry->d_inode,
 					file_inode(lower_file));
 	}
+	
+	printk("xcfs_write: normal exit, retval: %ld\n", retval);
 
-    /* encryption cont */
-    /*
-xcfs_write_cleanup:
-    kfree(buf);
-    */
+	/* encryption cont */
+	xcfs_write_cleanup:
+	kfree(wbuf);
+    	kfree(buf);
+	set_fs(old_fs);
 
 	return retval;
 }
