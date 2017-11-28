@@ -425,22 +425,16 @@ out_err:
 	return err;
 }
 
-/* new format is 
-static int xcfs_getattr(struct path *path, struct kstat *stat, u32 u, 
-        unsigned int ui) 
+static int xcfs_getattr(const struct path *path, struct kstat *stat, 
+        u32 request_mask, unsigned int flags) 
 {
-*/
-
-/*
-static int xcfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
-		struct kstat *stat)
-{
-	int err;
+    struct dentry *dentry = path->dentry;
+    int err;
 	struct kstat lower_stat;
 	struct path lower_path;
 
 	xcfs_get_lower_path(dentry, &lower_path);
-	err = vfs_getattr(&lower_path, &lower_stat);
+	err = vfs_getattr(&lower_path, &lower_stat, request_mask, flags);
 	if (err)
 		goto out;
 	fsstack_copy_attr_all(d_inode(dentry),
@@ -451,8 +445,8 @@ out:
 	xcfs_put_lower_path(dentry, &lower_path);
 	return err;
 }
-*/
 
+/* set attribute */
 static int
 xcfs_setxattr(struct dentry *dentry, struct inode *inode, const char *name,
 		const void *value, size_t size, int flags)
@@ -553,7 +547,7 @@ const struct inode_operations xcfs_inode_sym_ops = {
     .readlink	    = xcfs_readlink,
 	.permission	    = xcfs_permission,
     .setattr        = xcfs_setattr,
-    /* .getattr        = xcfs_getattr, */
+    .getattr        = xcfs_getattr,
     .get_link       = xcfs_get_link,
     .listxattr      = xcfs_listxattr,
 };
@@ -570,14 +564,14 @@ const struct inode_operations xcfs_inode_dir_ops = {
 	.rename		    = xcfs_rename,
 	.permission	    = xcfs_permission,
     .setattr        = xcfs_setattr,
-    /* .getattr        = xcfs_getattr, */
+    .getattr        = xcfs_getattr,
     .listxattr      = xcfs_listxattr,
 };
 
 const struct inode_operations xcfs_inode_file_ops = {
     .permission	    = xcfs_permission,
     .setattr        = xcfs_setattr,
-    /* .getattr        = xcfs_getattr, */
+    .getattr        = xcfs_getattr,
     .listxattr      = xcfs_listxattr,
 };
 
