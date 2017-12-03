@@ -1,5 +1,14 @@
 #include "xcfs.h"
 
+#include <linux/file.h>
+#include <linux/poll.h>
+#include <linux/slab.h>
+#include <linux/mount.h>
+#include <linux/pagemap.h>
+#include <linux/security.h>
+#include <linux/compat.h>
+#include <linux/fs_stack.h>
+
 /* encrypt and decrypt functions */
 static void xcfs_decrypt(char* buf, size_t count) 
 {
@@ -24,8 +33,16 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	struct file *lower_file;
 	char* buf = NULL;
 	long retval = 0;
-    int err = 0;
+    	int err = 0;
 	struct dentry *dentry = file->f_path.dentry;
+
+	printk("xcfs_read: *ppos = %llu, count = %lu, i_size = %llu\n",
+			*ppos, 		count, 	file->f_inode->i_size);
+
+	//if(count > (file->f_inode->i_size - *ppos))
+	//{
+	//	count = file->f_inode->i_size - *ppos;
+	//}
 
 	lower_file = xcfs_lower_file(file);
 	retval = vfs_read(lower_file, ubuf, count, ppos);
@@ -35,7 +52,9 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	}
 	err = retval;
 
-    /* decryption */
+
+ 
+   	/* decryption */
 	buf = kcalloc(count, sizeof(char), GFP_KERNEL);
 	if(buf == NULL) {
 		printk("xcfs_read: allocation failed for buf\n");
@@ -43,6 +62,8 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	}
 
     	retval = copy_from_user(buf, ubuf, count);
+	printk("xcfs_read: ubuf = %s", buf);
+
 	if(retval) {
 		printk("xcfs_read: failed to copy %ld from user\n", retval);
 		retval = -1;
@@ -59,6 +80,8 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	}
 	retval = err; 
 
+	printk("xcfs_read: buf = %s\n", buf);
+	printk("xcfs_read: normal exit, retval = %ld\n", retval);
 xcfs_read_cleanup:
 	kfree(buf);
 
@@ -85,6 +108,9 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	}
     
 	retval = copy_from_user(buf, ubuf, count);
+
+	printk("xcfs_write: ubuf = %s\n", buf);
+
 	if(retval) {
 		printk("xcfs_write: failed to copy %ld from user\n", retval);
 		retval = -1;
@@ -102,6 +128,7 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 					file_inode(lower_file));
 	}
 	
+	printk("xcfs_write: buf = %s\n", buf);
 	printk("xcfs_write: normal exit, retval: %ld\n", retval);
 
 	/* encryption cont */
@@ -183,6 +210,8 @@ static int xcfs_mmap(struct file *file, struct vm_area_struct *vma)
 	bool willwrite;
 	struct file *lower_file;
 	const struct vm_operations_struct *saved_vm_ops = NULL;
+	
+	printk("xcfs_mmap\n");
 
 	/* this might be deferred to mmap's writepage */
 	willwrite = ((vma->vm_flags | VM_SHARED | VM_WRITE) == vma->vm_flags);
