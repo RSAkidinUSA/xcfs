@@ -8,7 +8,7 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
-int xcfs_encrypt_page(struct page *page)
+int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
 {
 	struct inode *xcfs_inode = NULL;
 	char *temp_page_virt = NULL;
@@ -52,7 +52,7 @@ xcfs_encrypt_out:
 	return retval;
 }
 
-int xcfs_decrypt_page(struct page *page)
+int xcfs_decrypt_page(struct page *page, struct page *crypt_page)
 {
 	return 0;
 }
@@ -130,13 +130,14 @@ static ssize_t xcfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 static int xcfs_readpage(struct file *file, struct page *page)
 {
 	int retval = 0;
+    struct page *crypt_page;
 
 	printk("xcfs_readpage\n");
 
 	//get lower stat?
 	//probably not actually necessary
 
-	retval = xcfs_decrypt_page(page);
+	retval = xcfs_decrypt_page(page, crypt_page);
 	if(retval)
 	{
 		printk("Error decrypting page: %d\n", retval);
@@ -155,7 +156,9 @@ static int xcfs_readpage(struct file *file, struct page *page)
 
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	int retval = xcfs_encrypt_page(page);
+    struct page *crypt_page;
+    // TA says we shouldn't directly change the page we are given...
+	int retval = xcfs_encrypt_page(page, crypt_page);
 
 	printk("xcfs_writepage\n");
 
