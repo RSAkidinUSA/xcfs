@@ -187,8 +187,8 @@ out:
 static void __exit p4_exit(void)
 {
 	printk(PRINT_PREF "Unloading module: %s\n", XCFS_NAME);
-    xcfs_destroy_inode_cache();
-    xcfs_destroy_dentry_cache();
+	xcfs_destroy_inode_cache();
+	xcfs_destroy_dentry_cache();
 	unregister_filesystem(&xcfs_type);
 }
 
