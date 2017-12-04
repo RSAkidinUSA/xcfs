@@ -206,6 +206,7 @@ out:
 /* mmap */
 static int xcfs_mmap(struct file *file, struct vm_area_struct *vma)
 {
+    
 	int err = 0;
 	bool willwrite;
 	struct file *lower_file;
@@ -227,13 +228,17 @@ static int xcfs_mmap(struct file *file, struct vm_area_struct *vma)
 	 * generic_file_readonly_mmap returns in that case).
 	 */
 	lower_file = xcfs_lower_file(file);
+
+
 	if (willwrite && !lower_file->f_mapping->a_ops->writepage) {
 		err = -EINVAL;
 		printk(KERN_ERR "xcfs: lower file system does not "
 		       "support writeable mmap\n");
 		goto out;
 	}
-
+    // temp handler
+    err = generic_file_mmap(file, vma);
+    goto out;
 	/*
 	 * find and save lower vm_ops.
 	 *
