@@ -70,7 +70,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 		goto xcfs_read_cleanup;
 	}
 	
-	xcfs_decrypt(buf, count);
+	//xcfs_decrypt(buf, count);
 
 	retval = copy_to_user(ubuf, buf, count);
 	if(retval) {
@@ -117,7 +117,7 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 		goto xcfs_write_cleanup;
 	}
 	
-	xcfs_encrypt(buf, count);
+	//xcfs_encrypt(buf, count);
 
 	lower_file = xcfs_lower_file(file);
 	retval = vfs_write(lower_file, buf, count, ppos);
@@ -379,18 +379,11 @@ static int xcfs_fasync(int fd, struct file *file, int flag)
 /* llseek */
 static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
 {
-	int err;
 	struct file *lower_file;
 
-	err = generic_file_llseek(file, offset, whence);
-	if(err < 0) {
-		printk("xcfs_llseek: failed initial seek, aborting\n");
-		return err;
-	}
-	
 	lower_file = xcfs_lower_file(file);
-	err = generic_file_llseek(lower_file, offset, whence);
-	return err;
+    
+    return vfs_llseek(lower_file, offset, whence);
 }
 
 /* read iter */ 
@@ -453,7 +446,7 @@ static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 /* file operations for files and dirs */
 const struct file_operations xcfs_file_ops = {
-	.llseek 	= xcfs_llseek,
+	.llseek 	= generic_file_llseek,
 	.read 		= xcfs_read,
 	.write 		= xcfs_write,
 	.mmap		= xcfs_mmap,
