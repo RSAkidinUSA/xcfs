@@ -130,26 +130,23 @@ static ssize_t xcfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 static int xcfs_readpage(struct file *file, struct page *page)
 {
 	int retval = 0;
-    struct page *crypt_page;
-    char *page_data = (char *)kmap(page);
-    mm_segment_t old_fs;
-    mode_t orig_mode;
+    	struct page *crypt_page = NULL;
+    	mm_segment_t old_fs;
+    	mode_t orig_mode;
+    	char *page_data = (char *)kmap(page);
     
-    file->f_pos = page_offset(page);
+    	file->f_pos = page_offset(page);
 
-    orig_mode = file->f_mode;
-    file->f_mode |= FMODE_READ;
+    	orig_mode = file->f_mode;
+    	file->f_mode |= FMODE_READ;
 
 	printk("xcfs_readpage\n");
 
-	//get lower stat?
-	//probably not actually necessary
-    
-    old_fs = get_fs();
-    set_fs(get_ds());
+    	old_fs = get_fs();
+    	set_fs(get_ds());
 	//retval = xcfs_decrypt_page(page, crypt_page);
-    retval = vfs_read(file, page_data, PAGE_SIZE, 
-            &file->f_pos);
+    	retval = vfs_read(file, page_data, PAGE_SIZE, 
+				&file->f_pos);
 
 	if(retval)
 	{
@@ -194,10 +191,10 @@ static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 const struct address_space_operations xcfs_addr_ops = {
 	.readpage 	= xcfs_readpage,
 	.writepage 	= xcfs_writepage,
-	.direct_IO 	= xcfs_direct_IO,
+//	.direct_IO 	= xcfs_direct_IO,
 };
 
 const struct vm_operations_struct xcfs_vm_ops = {
-	.fault		= xcfs_fault,
-	.page_mkwrite	= xcfs_page_mkwrite,
+//	.fault		= xcfs_fault,
+//	.page_mkwrite	= xcfs_page_mkwrite,
 };

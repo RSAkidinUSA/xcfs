@@ -449,8 +449,8 @@ static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 /* file operations for files and dirs */
 const struct file_operations xcfs_file_ops = {
 	.llseek 	= generic_file_llseek,
-	.read 		= xcfs_read,
-	.write 		= xcfs_write,
+	//.read 		= xcfs_read,
+	//.write 		= xcfs_write,
 	.mmap		= xcfs_mmap,
 	.open		= xcfs_open,
 	.flush		= xcfs_flush,
