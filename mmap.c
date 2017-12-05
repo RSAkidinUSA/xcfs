@@ -57,119 +57,69 @@ int xcfs_decrypt_page(struct page *page, struct page *crypt_page)
 	return 0;
 }
 
-static int xcfs_fault(struct vm_fault *vmf)
+
+//returns number of bytes read (positive) or an error (negative)
+static int read_lower(struct file* file, char *data, loff_t offset, size_t size)
 {
-	int err;
-	struct file *file, *lower_file;
-	const struct vm_operations_struct *lower_vm_ops;
-	struct vm_area_struct lower_vma;
-
-	memcpy(&lower_vma, vmf->vma, sizeof(struct vm_area_struct));
-	file = lower_vma.vm_file;
-	lower_vm_ops = XCFS_F(file)->lower_vm_ops;
-	BUG_ON(!lower_vm_ops);
-
+	struct file *lower_file = NULL;
 	lower_file = xcfs_lower_file(file);
-	/*
-	 * XXX: vm_ops->fault may be called in parallel.  Because we have to
-	 * resort to temporarily changing the vma->vm_file to point to the
-	 * lower file, a concurrent invocation of xcfs_fault could see a
-	 * different value.  In this workaround, we keep a different copy of
-	 * the vma structure in our stack, so we never expose a different
-	 * value of the vma->vm_file called to us, even temporarily.  A
-	 * better fix would be to change the calling semantics of ->fault to
-	 * take an explicit file pointer.
-	 */
-	lower_vma.vm_file = lower_file;
-	err = lower_vm_ops->fault(vmf);
-	return err;
+	if(!lower_file)
+		return -EIO;
+	return kernel_read(lower_file, offset, data, size);
 }
 
-static int xcfs_page_mkwrite(struct vm_fault *vmf)
+//returns 0 on success, nonzero on failure
+static int read_lower_page_segment(	struct file *file,
+					struct page *page, pgoff_t page_index,
+					size_t offset_in_page, size_t size)
 {
-	int err = 0;
-	struct file *file, *lower_file;
-	const struct vm_operations_struct *lower_vm_ops;
-	struct vm_area_struct lower_vma;
+	char *virt = NULL;
+	loff_t offset = 0;
+	int rc = 0;
 
-	memcpy(&lower_vma, vmf->vma, sizeof(struct vm_area_struct));
-	file = lower_vma.vm_file;
-	lower_vm_ops = XCFS_F(file)->lower_vm_ops;
-	BUG_ON(!lower_vm_ops);
-	if (!lower_vm_ops->page_mkwrite)
-		goto out;
+	//calculate file offset from page offset and page index
+	offset = ((((loff_t)page_index) << PAGE_SHIFT) + offset_in_page);
+	virt = kmap(page);
+	
+	//hand off actual reading
+	rc = read_lower(file, virt, offset, size);
 
-	lower_file = xcfs_lower_file(file);
-	/*
-	 * XXX: vm_ops->page_mkwrite may be called in parallel.
-	 * Because we have to resort to temporarily changing the
-	 * vma->vm_file to point to the lower file, a concurrent
-	 * invocation of xcfs_page_mkwrite could see a different
-	 * value.  In this workaround, we keep a different copy of the
-	 * vma structure in our stack, so we never expose a different
-	 * value of the vma->vm_file called to us, even temporarily.
-	 * A better fix would be to change the calling semantics of
-	 * ->page_mkwrite to take an explicit file pointer.
-	 */
-	lower_vma.vm_file = lower_file;
-	err = lower_vm_ops->page_mkwrite(vmf);
-out:
-	return err;
+	if(rc > 0)	//positive return values mean we read correctly
+		rc = 0;
+
+	//some cleanup
+	kunmap(page);
+	flush_dcache_page(page);
+	return rc;
 }
 
-static ssize_t xcfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
-{
-	/*
-	 * This function should never be called directly.  We need it
-	 * to exist, to get past a check in open_check_o_direct(),
-	 * which is called from do_last().
-	 */
-	return -EINVAL;
-}
-
+//returns 0 on success, nonzero on failure
 static int xcfs_readpage(struct file *file, struct page *page)
 {
-	int retval = 0;
-    	struct page *crypt_page = NULL;
-    	mm_segment_t old_fs;
-    	mode_t orig_mode;
-    	char *page_data = (char *)kmap(page);
-    
-    	file->f_pos = page_offset(page);
-
-    	orig_mode = file->f_mode;
-    	file->f_mode |= FMODE_READ;
-
+	int rc = 0;
+	
 	printk("xcfs_readpage\n");
 
-    	old_fs = get_fs();
-    	set_fs(get_ds());
-	//retval = xcfs_decrypt_page(page, crypt_page);
-    	retval = vfs_read(file, page_data, PAGE_SIZE, 
-				&file->f_pos);
+	rc = read_lower_page_segment(file, page, page->index, 0,
+					PAGE_SIZE);
 
-	if(retval)
-	{
-		printk("Error decrypting page: %d\n", retval);
+	//end
+	if(rc)
 		ClearPageUptodate(page);
-	}
 	else
-	{
 		SetPageUptodate(page);
-	}
 
-    file->f_mode = orig_mode;
-    set_fs(old_fs);
-	//printk("Unlocking page with index = [0x%.161lx]\n", page->index);
 	unlock_page(page);
-
-	return retval;
+	printk("xcfs_readpage returns %d\n", rc);
+	return rc;
 }
+
+
 
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-    struct page *crypt_page;
-    // TA says we shouldn't directly change the page we are given...
+    	struct page *crypt_page = NULL;
+    	// TA says we shouldn't directly change the page we are given...
 	int retval = xcfs_encrypt_page(page, crypt_page);
 
 	printk("xcfs_writepage\n");
