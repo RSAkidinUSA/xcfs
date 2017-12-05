@@ -52,8 +52,33 @@ xcfs_encrypt_out:
 	return retval;
 }
 
-int xcfs_decrypt_page(struct page *page, struct page *crypt_page)
+/* encrypt and decrypt functions */
+static void xcfs_decrypt(char* buf, size_t count) 
 {
+	int i = 0;
+	printk("xcfs_decrypt\n");
+	for(i = 0; i < count; ++i) {
+		buf[i]--;
+	}
+}
+
+int xcfs_decrypt_page(struct file *file, struct page *page)
+{
+	char* virt = NULL;
+	struct file* lower_file = xcfs_lower_file(file);
+//	int count = lower_file->f_inode->i_size;
+
+	printk("xcfs_decrypt_page\n");
+
+	virt = kmap(page);
+
+	xcfs_decrypt(virt, PAGE_SIZE);
+
+	printk("virt = %s\n", virt);
+
+	//some cleanup
+	kunmap(page);
+	
 	return 0;
 }
 
@@ -62,6 +87,7 @@ int xcfs_decrypt_page(struct page *page, struct page *crypt_page)
 static int read_lower(struct file* file, char *data, loff_t offset, size_t size)
 {
 	struct file *lower_file = NULL;
+	printk("read_lower\n");
 	lower_file = xcfs_lower_file(file);
 	if(!lower_file)
 		return -EIO;
@@ -76,6 +102,8 @@ static int read_lower_page_segment(	struct file *file,
 	char *virt = NULL;
 	loff_t offset = 0;
 	int rc = 0;
+
+	printk("read_lower_page_segment\n");
 
 	//calculate file offset from page offset and page index
 	offset = ((((loff_t)page_index) << PAGE_SHIFT) + offset_in_page);
@@ -97,13 +125,17 @@ static int read_lower_page_segment(	struct file *file,
 static int xcfs_readpage(struct file *file, struct page *page)
 {
 	int rc = 0;
-	
+	int err = 0;	
+
 	printk("xcfs_readpage\n");
 
 	rc = read_lower_page_segment(file, page, page->index, 0,
 					PAGE_SIZE);
 
-	//end
+	//do decryption
+	err = xcfs_decrypt_page(file, page);
+	//end decryption
+
 	if(rc)
 		ClearPageUptodate(page);
 	else

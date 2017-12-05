@@ -9,14 +9,6 @@
 #include <linux/compat.h>
 #include <linux/fs_stack.h>
 
-/* encrypt and decrypt functions */
-static void xcfs_decrypt(char* buf, size_t count) 
-{
-	int i = 0;
-	for(i = 0; i < count; ++i) {
-		buf[i]--;
-	}
-}
 
 static void xcfs_encrypt(char* buf, size_t count) 
 {
