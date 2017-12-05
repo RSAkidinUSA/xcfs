@@ -39,14 +39,14 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	printk("xcfs_read: *ppos = %llu, count = %lu, i_size = %llu\n",
 			*ppos, 		count, 	file->f_inode->i_size);
 
-	//if(count > (file->f_inode->i_size - *ppos))
-	//{
-	//	count = file->f_inode->i_size - *ppos;
-	//}
+	if(count > (file->f_inode->i_size - *ppos))
+	{
+		count = file->f_inode->i_size - *ppos;
+	}
 
 	lower_file = xcfs_lower_file(file);
 	retval = vfs_read(lower_file, ubuf, count, ppos);
-	if(retval >= 0)	{
+	if(retval <= 0)	{
 		fsstack_copy_attr_atime(dentry->d_inode, 
 					file_inode(lower_file));
 	}
@@ -61,8 +61,10 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 		return -1;
 	}
 
+	printk("xcfs_read: ubuf = %s", ubuf);
     	retval = copy_from_user(buf, ubuf, count);
-	printk("xcfs_read: ubuf = %s", buf);
+	printk("xcfs_read: buf = %s\n", buf);
+    printk("xcfs_read: count = %d\n", count);
 
 	if(retval) {
 		printk("xcfs_read: failed to copy %ld from user\n", retval);
@@ -71,6 +73,7 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	}
 	
 	//xcfs_decrypt(buf, count);
+	printk("xcfs_read: buf = %s\n", buf);
 
 	retval = copy_to_user(ubuf, buf, count);
 	if(retval) {
@@ -80,7 +83,6 @@ static ssize_t xcfs_read(struct file *file, char __user *ubuf,
 	}
 	retval = err; 
 
-	printk("xcfs_read: buf = %s\n", buf);
 	printk("xcfs_read: normal exit, retval = %ld\n", retval);
 xcfs_read_cleanup:
 	kfree(buf);

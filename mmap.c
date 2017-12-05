@@ -131,13 +131,26 @@ static int xcfs_readpage(struct file *file, struct page *page)
 {
 	int retval = 0;
     struct page *crypt_page;
+    char *page_data = (char *)kmap(page);
+    mm_segment_t old_fs;
+    mode_t orig_mode;
+    
+    file->f_pos = page_offset(page);
+
+    orig_mode = file->f_mode;
+    file->f_mode |= FMODE_READ;
 
 	printk("xcfs_readpage\n");
 
 	//get lower stat?
 	//probably not actually necessary
+    
+    old_fs = get_fs();
+    set_fs(get_ds());
+	//retval = xcfs_decrypt_page(page, crypt_page);
+    retval = vfs_read(file, page_data, PAGE_SIZE, 
+            &file->f_pos);
 
-	retval = xcfs_decrypt_page(page, crypt_page);
 	if(retval)
 	{
 		printk("Error decrypting page: %d\n", retval);
@@ -148,7 +161,9 @@ static int xcfs_readpage(struct file *file, struct page *page)
 		SetPageUptodate(page);
 	}
 
-	printk("Unlocking page with index = [0x%.161lx]\n", page->index);
+    file->f_mode = orig_mode;
+    set_fs(old_fs);
+	//printk("Unlocking page with index = [0x%.161lx]\n", page->index);
 	unlock_page(page);
 
 	return retval;
@@ -164,7 +179,7 @@ static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 
 	if(retval)
 	{
-		printk("Error encrypting page [0x%161lx]\n", page->index);
+		//printk("Error encrypting page [0x%161lx]\n", page->index);
 		ClearPageUptodate(page);
 	}
 	else
