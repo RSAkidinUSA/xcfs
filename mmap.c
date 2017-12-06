@@ -119,41 +119,6 @@ int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
 	return 0;
 }
 
-//returns bytes written on success, negative on error
-int write_lower(struct file *file, char *data, loff_t offset, size_t size)
-{
-	struct file *lower_file;
-	ssize_t rc = 0;
-	
-	lower_file = xcfs_lower_file(file);
-	if(!lower_file)
-		return -EIO;
-	rc = kernel_write(lower_file, data, size, offset);
-	mark_inode_dirty_sync(file->f_inode);
-
-	return rc;
-}
-
-//returns 0 on success, nonzero otherwise
-int write_lower_page_segment(struct file* file, struct page *page,
-				size_t offset_in_page, size_t size)
-{
-	char* virt = NULL;
-	loff_t offset = 0;
-	int rc = 0;
-	
-	offset = ((((loff_t)page->index) << PAGE_SHIFT) + offset_in_page);
-	virt = kmap(page);
-
-	//hand off writing
-	rc = write_lower(file, virt, offset, size);
-
-	if(rc > 0) 	//positive if bytes were successfully written,
-		rc = 0; //	so we should return 0
-	kunmap(page);
-	return rc;
-}
-
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
     	struct page *crypt_page = NULL;
@@ -174,8 +139,15 @@ static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 	//encrypt the page given to us and store it in a temporary page
 	xcfs_encrypt_page(page, crypt_page);
 
-	//pass the temporary (encrypted) page to the lower filesystem
-	//retval = write_lower_page_segment(file, crypt_page, 0, PAGE_SIZE);
+	//passes the writepage call down to the lower filesystem,
+	//	using the encrypted page
+	//we can't pass it down to kernel_write like we do in readpage,
+	//	because there's no way to get the "struct file" data structure
+	//	for the page we're given without making some modifications
+	//	to the module's data structures (see the ecrypfs_inode_info 
+	//	struct)
+	//(we could probably implement readpage in the same way, but it works
+	//	as-is, and I don't want to mess with it)
 	retval = lower_inode->i_mapping->a_ops->writepage(crypt_page, wbc);
 
 xcfs_writepage_out:
