@@ -8,59 +8,7 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
-void xcfs_encrypt(char* buf, size_t count) 
-{
-	int i = 0;
-	for(i = 0; i < count; ++i) {
-		buf[i]++;
-	}
-}
-
-int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
-{
-	struct inode *xcfs_inode = NULL;
-	char *temp_page_virt = NULL;
-	struct page *temp_page = NULL;
-	int retval = 0;
-	char *old_page_virt = kmap(page);
-
-	xcfs_inode = page->mapping->host;
-	
-	//allocate temporary page
-	temp_page = alloc_page(GFP_USER);
-	if(temp_page == NULL)
-	{
-		retval = -ENOMEM;
-		printk("Error allocation memory for temp encrypted page\n");
-		goto xcfs_encrypt_out;
-	}
-
-	//map temp page to useable address
-	temp_page_virt = kmap(temp_page);
-	
-	printk("copying old to temp page\n");
-	memcpy(temp_page_virt, old_page_virt, PAGE_SIZE);
-
-	//for each extent
-	//	do encryption
-	//		check failure
-	//	write extent to lower page
-	//		check failure
-	//end for
-
-	retval = 0;
-xcfs_encrypt_out:
-	//frees and unmaps temporary page, if necessary
-	if(temp_page)
-	{
-		kunmap(temp_page);
-		__free_page(temp_page);
-	}
-
-	return retval;
-}
-
-/* encrypt and decrypt functions */
+//Reading and Decryption
 void xcfs_decrypt(char* buf, size_t count) 
 {
 	int i = 0;
@@ -114,8 +62,8 @@ static int read_lower_page_segment(	struct file *file,
 	//hand off actual reading
 	rc = read_lower(file, virt, offset, size);
 
-	if(rc > 0)	//positive return values mean we read correctly
-		rc = 0;
+	if(rc > 0)	//positive values mean we read correctly,
+		rc = 0;	//	so this function should return 0
 
 	//some cleanup
 	kunmap(page);
@@ -127,7 +75,6 @@ static int read_lower_page_segment(	struct file *file,
 static int xcfs_readpage(struct file *file, struct page *page)
 {
 	int rc = 0;
-	int err = 0;	
 
 	printk("xcfs_readpage\n");
 
@@ -135,8 +82,7 @@ static int xcfs_readpage(struct file *file, struct page *page)
 					PAGE_SIZE);
 
 	//do decryption
-	err = xcfs_decrypt_page(file, page);
-	//end decryption
+	xcfs_decrypt_page(file, page);
 
 	if(rc)
 		ClearPageUptodate(page);
@@ -148,21 +94,100 @@ static int xcfs_readpage(struct file *file, struct page *page)
 	return rc;
 }
 
+//Writing and Encryption
+void xcfs_encrypt(char* buf, size_t count) 
+{
+	int i = 0;
+	printk("xcfs_encrypt\n");
+	for(i = 0; i < count; ++i) {
+		buf[i]++;
+	}
+}
 
+int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
+{
+	char *old_page_virt = kmap(page);
+	char *crypt_page_virt = kmap(crypt_page);
+
+	printk("xcfs_encrypt_page\n");	
+	
+	//copies old page to temp page
+	memcpy(crypt_page_virt, old_page_virt, PAGE_SIZE);
+
+	xcfs_encrypt(crypt_page_virt, PAGE_SIZE);
+
+	return 0;
+}
+
+//returns bytes written on success, negative on error
+int write_lower(struct file *file, char *data, loff_t offset, size_t size)
+{
+	struct file *lower_file;
+	ssize_t rc = 0;
+	
+	lower_file = xcfs_lower_file(file);
+	if(!lower_file)
+		return -EIO;
+	rc = kernel_write(lower_file, data, size, offset);
+	mark_inode_dirty_sync(file->f_inode);
+
+	return rc;
+}
+
+//returns 0 on success, nonzero otherwise
+int write_lower_page_segment(struct file* file, struct page *page,
+				size_t offset_in_page, size_t size)
+{
+	char* virt = NULL;
+	loff_t offset = 0;
+	int rc = 0;
+	
+	offset = ((((loff_t)page->index) << PAGE_SHIFT) + offset_in_page);
+	virt = kmap(page);
+
+	//hand off writing
+	rc = write_lower(file, virt, offset, size);
+
+	if(rc > 0) 	//positive if bytes were successfully written,
+		rc = 0; //	so we should return 0
+	kunmap(page);
+	return rc;
+}
 
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
     	struct page *crypt_page = NULL;
+	struct inode *lower_inode = xcfs_lower_inode(page->mapping->host);
+	int retval = 0;
 	
-	int retval = xcfs_encrypt_page(page, crypt_page);
-	
-	//write_to_lower(crypt_page);
-
 	printk("xcfs_writepage\n");
+	
+	//allocate temporary page
+	crypt_page = alloc_page(GFP_USER);
+	if(crypt_page == NULL)
+	{
+		retval = -ENOMEM;
+		printk("Error allocation memory for temp encrypted page\n");
+		goto xcfs_writepage_out;
+	}
 
+	//encrypt the page given to us and store it in a temporary page
+	xcfs_encrypt_page(page, crypt_page);
+
+	//pass the temporary (encrypted) page to the lower filesystem
+	//retval = write_lower_page_segment(file, crypt_page, 0, PAGE_SIZE);
+	retval = lower_inode->i_mapping->a_ops->writepage(crypt_page, wbc);
+
+xcfs_writepage_out:
+	//frees temporary page, if necessary
+	if(crypt_page)
+	{
+		__free_page(crypt_page);
+	}
+	
 	if(retval)
 	{
-		//printk("Error encrypting page [0x%161lx]\n", page->index);
+		printk("xcfs_encrypt_page: error encrypting page\n");
 		ClearPageUptodate(page);
 	}
 	else
@@ -173,14 +198,7 @@ static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 	return retval;
 }
 
-
 const struct address_space_operations xcfs_addr_ops = {
 	.readpage 	= xcfs_readpage,
 	.writepage 	= xcfs_writepage,
-//	.direct_IO 	= xcfs_direct_IO,
-};
-
-const struct vm_operations_struct xcfs_vm_ops = {
-//	.fault		= xcfs_fault,
-//	.page_mkwrite	= xcfs_page_mkwrite,
 };
