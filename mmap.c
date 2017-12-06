@@ -8,6 +8,14 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
+void xcfs_encrypt(char* buf, size_t count) 
+{
+	int i = 0;
+	for(i = 0; i < count; ++i) {
+		buf[i]++;
+	}
+}
+
 int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
 {
 	struct inode *xcfs_inode = NULL;
@@ -53,7 +61,7 @@ xcfs_encrypt_out:
 }
 
 /* encrypt and decrypt functions */
-static void xcfs_decrypt(char* buf, size_t count) 
+void xcfs_decrypt(char* buf, size_t count) 
 {
 	int i = 0;
 	printk("xcfs_decrypt\n");
@@ -64,17 +72,11 @@ static void xcfs_decrypt(char* buf, size_t count)
 
 int xcfs_decrypt_page(struct file *file, struct page *page)
 {
-	char* virt = NULL;
-	struct file* lower_file = xcfs_lower_file(file);
-//	int count = lower_file->f_inode->i_size;
+	char* virt = kmap(page);
 
 	printk("xcfs_decrypt_page\n");
 
-	virt = kmap(page);
-
 	xcfs_decrypt(virt, PAGE_SIZE);
-
-	printk("virt = %s\n", virt);
 
 	//some cleanup
 	kunmap(page);
@@ -151,8 +153,10 @@ static int xcfs_readpage(struct file *file, struct page *page)
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
     	struct page *crypt_page = NULL;
-    	// TA says we shouldn't directly change the page we are given...
+	
 	int retval = xcfs_encrypt_page(page, crypt_page);
+	
+	//write_to_lower(crypt_page);
 
 	printk("xcfs_writepage\n");
 

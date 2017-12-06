@@ -24,6 +24,9 @@
 #define XCFS_NAME           "xcfs"
 #define PRINT_PREF KERN_INFO "[xcfs]: "
 
+void xcfs_decrypt(char* buf, size_t count);
+void xcfs_encrypt(char* buf, size_t count);
+
 /* operations vectors defined in specific files */
 extern const struct file_operations xcfs_file_ops;
 extern const struct file_operations xcfs_dir_ops;
