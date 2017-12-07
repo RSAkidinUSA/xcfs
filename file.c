@@ -10,7 +10,9 @@
 #include <linux/fs_stack.h>
 
 
-/* read */
+/* copied from wrapfs, and modified */
+/* this function reads from a file, decrypts */
+/* and writes into a buffer */
 static ssize_t xcfs_read(struct file *file, char __user *ubuf, 
         size_t count, loff_t *ppos) 
 {
@@ -69,7 +71,9 @@ xcfs_read_cleanup:
 	return retval;
 }
 
-/* write */
+/* copied from wrapfs with modification */
+/* this function reads from a buffer, encrypts */
+/* and writes the encrypted data to a file */
 static ssize_t xcfs_write(struct file *file, const char __user *ubuf, 
         size_t count, loff_t *ppos) 
 {
@@ -115,7 +119,8 @@ static ssize_t xcfs_write(struct file *file, const char __user *ubuf,
 	return retval;
 }
 
-/* iterate */
+/* copied from wrapfs */
+/* this function iterates through the files in a directory */
 static int xcfs_readdir(struct file *file, struct dir_context *ctx) 
 {
 	int err;
@@ -132,6 +137,8 @@ static int xcfs_readdir(struct file *file, struct dir_context *ctx)
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function checks if the io buffer for a file is unlocked */
 /* unlocked ioctl */
 static long xcfs_unlocked_ioctl(struct file *file, unsigned int cmd,
 				  unsigned long arg)
@@ -179,6 +186,8 @@ out:
 }
 #endif
 
+/* copied from wrapfs and modified */
+/* this function defines the actions for a file when mmap is called */
 /* mmap */
 static int xcfs_mmap(struct file *file, struct vm_area_struct *vma)
 {
@@ -244,6 +253,8 @@ out:
 	return err;
 }
 
+/* coped from wrapfs */
+/* this function handles how an inode is opened */
 /* open */
 static int xcfs_open(struct inode *inode, struct file *file)
 {
@@ -287,6 +298,8 @@ out_err:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines how a file should be flushed */
 /* flush */
 static int xcfs_flush(struct file *file, fl_owner_t id)
 {
@@ -302,6 +315,8 @@ static int xcfs_flush(struct file *file, fl_owner_t id)
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines how a file should be released */
 /* release */
 static int xcfs_release(struct inode *inode, struct file *file)
 {
@@ -317,6 +332,8 @@ static int xcfs_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/* copied from wrapfs */
+/* this function defines how a file should be synced */
 /* fsync */
 static int xcfs_fsync(struct file *file, loff_t start, loff_t end,
 			int datasync)
@@ -338,6 +355,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* just another file operation, has to do with async syncing */
 /* fasync */
 static int xcfs_fasync(int fd, struct file *file, int flag)
 {
@@ -352,6 +371,8 @@ static int xcfs_fasync(int fd, struct file *file, int flag)
 	return err;
 }
 
+/* copied from wrapfs */
+/* defines behavior for seeking through a file */
 /* llseek */
 static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
 {
@@ -362,6 +383,8 @@ static loff_t xcfs_llseek(struct file* file, loff_t offset, int whence)
     return vfs_llseek(lower_file, offset, whence);
 }
 
+/* copied from wrapfs */
+/* defines behavior for reading a interator */
 /* read iter */ 
 static ssize_t xcfs_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
@@ -388,6 +411,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* defines a behavior for writing to an iterator */
 /* write iter */
 static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
@@ -418,9 +443,7 @@ static ssize_t xcfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 }	
 
 
-/* lock */
-
-/* file operations for files and dirs */
+/* file operations for files */
 const struct file_operations xcfs_file_ops = {
 	.llseek 	= generic_file_llseek,
 	.read 		= xcfs_read,
@@ -439,6 +462,7 @@ const struct file_operations xcfs_file_ops = {
 	.write_iter = xcfs_write_iter,
 };
 
+/* file operations for directories */
 const struct file_operations xcfs_dir_ops = {
 	.llseek		= xcfs_llseek,
 	.read		= generic_read_dir,
