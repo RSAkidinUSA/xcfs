@@ -4,6 +4,8 @@ const char XCFS_SALT[] = "SALTIEST SALT OF THE SEA";
 /* The dentry cache is just so we have properly sized dentries */
 static struct kmem_cache *xcfs_dentry_cachep;
 
+/* copied from wrapfs */
+/* this function inits a dentry cache */
 int xcfs_init_dentry_cache(void)
 {
 	xcfs_dentry_cachep =
@@ -14,6 +16,8 @@ int xcfs_init_dentry_cache(void)
 	return xcfs_dentry_cachep ? 0 : -ENOMEM;
 }
 
+/* copied from wrapfs */
+/* this function destoys a dentry cache */
 void xcfs_destroy_dentry_cache(void)
 {
 	if (xcfs_dentry_cachep) {
@@ -21,6 +25,8 @@ void xcfs_destroy_dentry_cache(void)
     }
 }
 
+/* copied from wrapfs */
+/* this function frees a dentry's private data */
 void free_dentry_private_data(struct dentry *dentry)
 {
 	if (!dentry || !dentry->d_fsdata){
@@ -30,6 +36,7 @@ void free_dentry_private_data(struct dentry *dentry)
 	dentry->d_fsdata = NULL;
 }
 
+/* copied from wrapfs */
 /* allocate new dentry private data */
 int new_dentry_private_data(struct dentry *dentry)
 {
@@ -47,6 +54,8 @@ int new_dentry_private_data(struct dentry *dentry)
 	return 0;
 }
 
+/* copied from wrapfs */
+/* this function tests if a lower inode is the lower inode of another inode */
 static int xcfs_inode_test(struct inode *inode, void *candidate_lower_inode)
 {
 	struct inode *current_lower_inode = xcfs_lower_inode(inode);
@@ -57,12 +66,16 @@ static int xcfs_inode_test(struct inode *inode, void *candidate_lower_inode)
     }
 }
 
+/* copied from wrapfs */
+/* this function does nothing */
 static int xcfs_inode_set(struct inode *inode, void *lower_inode)
 {
 	/* we do actual inode initialization in xcfs_iget */
 	return 0;
 }
 
+/* copied from wrapfs */
+/* this function gets an inode from a superblock */
 struct inode *xcfs_iget(struct super_block *sb, struct inode *lower_inode)
 {
 	struct xcfs_inode_info *info;
@@ -184,6 +197,8 @@ out:
  * @sb: xcfs's super_block
  * @lower_path: the lower path (caller does path_get/put)
  */
+/* copied from wrapfs */
+/* this function interposes a dentry into a path */
 int xcfs_interpose(struct dentry *dentry, struct super_block *sb,
 		     struct path *lower_path)
 {
@@ -287,6 +302,8 @@ out:
 	return ret_dentry;
 }
 
+/* copied from wrapfs */
+/* this function looks up a directory in a dentry */
 struct dentry *xcfs_lookup(struct inode *dir, struct dentry *dentry,
 			     unsigned int flags)
 {
