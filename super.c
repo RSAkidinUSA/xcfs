@@ -2,6 +2,8 @@
 
 static struct kmem_cache *xcfs_inode_cachep;
 
+/* copied from wrapfs */
+/* this function defines how to fill a superblock */
 static void xcfs_put_super(struct super_block* sb)
 {
     struct xcfs_sb_info *spd;
@@ -20,6 +22,8 @@ static void xcfs_put_super(struct super_block* sb)
 	sb->s_fs_info = NULL;
 }
 
+/* copied from wrapfs */
+/* this function defines how to get information on a dentry in a superblock */
 static int xcfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int err;
@@ -35,6 +39,8 @@ static int xcfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines how to remount a filesystem */
 static int xcfs_remount_fs(struct super_block *sb, int *flags, char *options)
 {
 	int err = 0;
@@ -59,6 +65,8 @@ static int xcfs_remount_fs(struct super_block *sb, int *flags, char *options)
  * that needs to be, before the inode is completely destroyed and put
  * on the inode free list.
  */
+/* copied from wrapfs */
+/* this function defines how to evict an inode */
 static void xcfs_evict_inode(struct inode *inode)
 {
 	struct inode *lower_inode;
@@ -74,6 +82,8 @@ static void xcfs_evict_inode(struct inode *inode)
 	iput(lower_inode);
 }
 
+/* copied from wrapfs */
+/* this function defines how to allocate an inode */
 static struct inode *xcfs_alloc_inode(struct super_block *sb)
 {
 	struct xcfs_inode_info *i;
@@ -89,6 +99,8 @@ static struct inode *xcfs_alloc_inode(struct super_block *sb)
 	return &i->vfs_inode;
 }
 
+/* copied from wrapfs */
+/* this function defines how to destroy an inode */
 static void xcfs_destroy_inode(struct inode *inode)
 {
 	kmem_cache_free(xcfs_inode_cachep, XCFS_I(inode));
@@ -102,6 +114,8 @@ static void init_once(void *obj)
 	inode_init_once(&i->vfs_inode);
 }
 
+/* copied from wrapfs */
+/* this function defines behaviour for initializing an inode cache */
 int xcfs_init_inode_cache(void)
 {
 	int err = 0;
@@ -115,6 +129,7 @@ int xcfs_init_inode_cache(void)
 	return err;
 }
 
+/* copied from wrapfs */
 /* xcfs inode cache destructor */
 void xcfs_destroy_inode_cache(void)
 {
@@ -126,6 +141,8 @@ void xcfs_destroy_inode_cache(void)
  * Used only in nfs, to kill any pending RPC tasks, so that subsequent
  * code can actually succeed and won't leave tasks that need handling.
  */
+/* copied from wrapfs */
+/* this function defines how to unmount a superblock */
 static void xcfs_umount_begin(struct super_block *sb)
 {
 	struct super_block *lower_sb;
