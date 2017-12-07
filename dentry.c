@@ -1,5 +1,6 @@
 #include "xcfs.h"
 
+/* copied from wrapfs, this code checks if a dentry is valid */
 /*
  * returns: -ERRNO if error (returned to user)
  *          0: tell VFS to invalidate dentry
@@ -24,6 +25,7 @@ out:
 	return err;
 }
 
+/* copied from wrapfs, this code releases a locked dentry */
 static void xcfs_d_release(struct dentry *dentry)
 {
 	/* release and reset the lower paths */
@@ -32,6 +34,7 @@ static void xcfs_d_release(struct dentry *dentry)
 	return;
 }
 
+/* copied from wrapfs, these are the operations for dentries */
 const struct dentry_operations xcfs_dent_ops = {
 	.d_revalidate	= xcfs_d_revalidate,
 	.d_release	= xcfs_d_release,
