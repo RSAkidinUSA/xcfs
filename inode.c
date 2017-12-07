@@ -1,5 +1,7 @@
 #include "xcfs.h"
 
+/* copied from wrapfs */
+/* this function defines the behavior of how to create a new inode */
 static int xcfs_create(struct inode* dir, struct dentry* dentry, 
 				umode_t mode, bool want_excl)
 {
@@ -28,6 +30,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behaviour of how to a link an inode */
 static int xcfs_link(struct dentry *old_dentry, struct inode *dir,
 		       struct dentry *new_dentry)
 {
@@ -65,6 +69,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behaviou of how to unlink an inode */
 static int xcfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int err;
@@ -104,6 +110,9 @@ out:
 	return err;
 }
 
+
+/* copied from wrapfs */
+/* this function defines the behavior of how to symlink an inode */
 static int xcfs_symlink(struct inode *dir, struct dentry *dentry,
 			  const char *symname)
 {
@@ -131,6 +140,9 @@ out:
 	return err;
 }
 
+
+/* copied from wrapfs */
+/* this function defines the behaviour of how to make a directory */
 static int xcfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int err;
@@ -161,6 +173,9 @@ out:
 	return err;
 }
 
+
+/* copied from wrapfs */
+/* this function defines the behavior of how to delete a directory */
 static int xcfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct dentry *lower_dentry;
@@ -189,6 +204,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior of how to make a new inode */
 static int xcfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode,
 			dev_t dev)
 {
@@ -221,6 +238,8 @@ out:
  * The locking rules in xcfs_rename are complex.  We could use a simpler
  * superblock-level name-space lock for renames and copy-ups.
  */
+/* copied from wrapfs */
+/* this function defines the behaviour of how to rename an inode */
 static int xcfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			 struct inode *new_dir, struct dentry *new_dentry,
              unsigned int flags)
@@ -280,6 +299,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior of how to read a linked inode */
 static int xcfs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 {
 	int err;
@@ -305,6 +326,9 @@ out:
 	return err;
 }
 
+
+/* copied from wrapfs */
+/* this function defines the behavior of how to get a link from an inode */
 static const char *xcfs_get_link(struct dentry *dentry, struct inode *inode,
 				   struct delayed_call *done)
 {
@@ -337,6 +361,8 @@ static const char *xcfs_get_link(struct dentry *dentry, struct inode *inode,
 	return buf;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior for getting the permission of an inode */
 static int xcfs_permission(struct inode *inode, int mask)
 {
 	struct inode *lower_inode;
@@ -347,6 +373,8 @@ static int xcfs_permission(struct inode *inode, int mask)
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior for setting attributes of an inode */
 static int xcfs_setattr(struct dentry *dentry, struct iattr *ia)
 {
 	int err;
@@ -425,6 +453,8 @@ out_err:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior for getting the attributes of an inode */
 static int xcfs_getattr(const struct path *path, struct kstat *stat, 
         u32 request_mask, unsigned int flags) 
 {
@@ -446,7 +476,8 @@ out:
 	return err;
 }
 
-/* set attribute */
+/* copied from wrapfs */
+/* this function defines the behavior for setting the xattr of an inode */
 static int
 xcfs_setxattr(struct dentry *dentry, struct inode *inode, const char *name,
 		const void *value, size_t size, int flags)
@@ -470,6 +501,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior for getting the xattr for an inode */
 static ssize_t
 xcfs_getxattr(struct dentry *dentry, struct inode *inode,
 		const char *name, void *buffer, size_t size)
@@ -496,6 +529,8 @@ out:
 	return err;
 }
 
+/* copied from wrapfs */
+/* this function defines the behavior for listing the xattr for an inode */
 static ssize_t
 xcfs_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 {
@@ -518,6 +553,7 @@ out:
 	xcfs_put_lower_path(dentry, &lower_path);
 	return err;
 }
+
 
 static int
 xcfs_removexattr(struct dentry *dentry, struct inode *inode, const char *name)
