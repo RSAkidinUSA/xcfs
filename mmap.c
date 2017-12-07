@@ -121,7 +121,7 @@ int xcfs_encrypt_page(struct page *page, struct page *crypt_page)
 
 static int xcfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-    	struct page *crypt_page = NULL;
+    struct page *crypt_page = NULL;
 	struct inode *lower_inode = xcfs_lower_inode(page->mapping->host);
 	int retval = 0;
 	
